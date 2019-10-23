@@ -4,18 +4,18 @@ use QAST:from<NQP>;
 sub Bio::seq(Str $sequence) is export {
     use Bio::Grammar::Fasta;
     use Bio::Grammar::Actions::Fasta;
-    Bio::Grammar::Fasta.parse($sequence, actions => Bio::Grammar::Actions::Fasta).ast;
+    return Bio::Grammar::Fasta.parse($sequence, actions => Bio::Grammar::Actions::Fasta).ast;
 }
  
 sub EXPORT(|) {
-    role Bio::Grammar {
+    role Bio::Slang::Grammar {
         token quote:sym<` `> {
         '`' <bioseq> [ '`' || <.FAILGOAL: '`'> ]
         }
         token bioseq { <-[`]>* }
     }
  
-    role Bio::Actions {
+    role Bio::Slang::Actions {
         method quote:sym<` `>(Mu $/) {
             my $seq := nqp::atkey(nqp::findmethod($/, 'hash')($/), 'bioseq');
             my $call := QAST::Op.new(
@@ -23,19 +23,22 @@ sub EXPORT(|) {
                                 :name<&Bio::seq>,
                                 QAST::SVal.new(:value($seq.Str))
                         );
-            $/.'!make'($call);
+            $/.make($call);
         }
     }
 
-    if $*PERL.compiler.version before v2017.03 { # old way
-        nqp::bindkey(%*LANG, 'MAIN', %*LANG<MAIN>.HOW.mixin(%*LANG<MAIN>, Bio::Grammar));
-        nqp::bindkey(%*LANG, 'MAIN-actions', %*LANG<MAIN-actions>.HOW.mixin(%*LANG<MAIN-actions>, Bio::Actions));
+    # Register our grammar and actions as a Slang extending the MAIN language handling
+    if $*PERL.compiler.version before v2017.03 {
+        nqp::bindkey(%*LANG, 'MAIN', %*LANG<MAIN>.HOW.mixin(%*LANG<MAIN>, Bio::Slang::Grammar));
+        nqp::bindkey(%*LANG, 'MAIN-actions', %*LANG<MAIN-actions>.HOW.mixin(%*LANG<MAIN-actions>, Bio::Slang::Actions));
     }
-    else { # new way
-        $ = $*LANG.define_slang('MAIN',
-                $*LANG.slang_grammar('MAIN').^mixin(Bio::Grammar),
-                $*LANG.actions.^mixin(Bio::Actions))
+    else {
+        $ = $*LANG.define_slang(
+            'MAIN',
+            $*LANG.slang_grammar('MAIN').^mixin(Bio::Slang::Grammar),
+            $*LANG.actions.^mixin(Bio::Slang::Actions)
+        )
     }
-    
+
     {}
 } 
