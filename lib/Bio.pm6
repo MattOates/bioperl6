@@ -26,8 +26,16 @@ sub EXPORT(|) {
             $/.'!make'($call);
         }
     }
- 
-    nqp::bindkey(%*LANG, 'MAIN', %*LANG<MAIN>.HOW.mixin(%*LANG<MAIN>, Bio::Grammar));
-    nqp::bindkey(%*LANG, 'MAIN-actions', %*LANG<MAIN-actions>.HOW.mixin(%*LANG<MAIN-actions>, Bio::Actions));
+
+    if $*PERL.compiler.version before v2017.03 { # old way
+        nqp::bindkey(%*LANG, 'MAIN', %*LANG<MAIN>.HOW.mixin(%*LANG<MAIN>, Bio::Grammar));
+        nqp::bindkey(%*LANG, 'MAIN-actions', %*LANG<MAIN-actions>.HOW.mixin(%*LANG<MAIN-actions>, Bio::Actions));
+    }
+    else { # new way
+        $ = $*LANG.define_slang('MAIN',
+                $*LANG.slang_grammar('MAIN').^mixin(Bio::Grammar),
+                $*LANG.actions.^mixin(Bio::Actions))
+    }
+    
     {}
 } 
